@@ -1,0 +1,19 @@
+# pyrefly: ignore [missing-import]
+from flask import Flask
+from server.db import init_db
+from server.routes.templates import templates_bp
+from server.routes.data_process import processing_bp
+from server.routes.injestion import injestion_bp
+
+def create_app():
+    app = Flask(__name__)
+
+    # Initialize DB tables on startup
+    init_db()
+
+    # Register your route groups
+    app.register_blueprint(templates_bp)
+    app.register_blueprint(processing_bp)
+    app.register_blueprint(injestion_bp)
+
+    return app

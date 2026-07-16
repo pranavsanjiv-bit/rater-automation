@@ -1,0 +1,30 @@
+{
+    "dob" : {
+        "create_lead" : "borrowers.0.dob",
+        "save_loan" : "borrowers.0.dob"
+    },
+    "loan_amount":{
+        "create_lead" : "loan.amount",
+        "save_loan" : "loan.amount"
+    },
+    "loan_tenure":{
+        "create_lead" : "loan.tenure",
+        "save_loan" : "loan.tenure"
+    },
+    "loan_type":{
+        "create_lead" : "loan.type",
+        "save_loan" : "loan.type"
+    },
+    "gender":{
+        "create_lead" : "borrowers.0.gender",
+        "save_loan" : "borrowers.0.gender"
+    },
+    "property_pincode":{
+        "create_lead" : "property.address.zipcode",
+        "save_loan" : "assets.0.address.zipcode"
+    },
+    "coverage_type":{
+        "create_lead" : "loan.coverage_type",
+        "save_loan" : "loan.coverage_type"
+    }
+}

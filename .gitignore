@@ -1,0 +1,21 @@
+# Virtual environments
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+server/routes/.env
+
+# macOS
+.DS_Store
+
+# Database
+server/rater.db
+
+# IDE
+.vscode/
+.idea/

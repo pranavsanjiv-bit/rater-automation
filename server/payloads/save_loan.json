@@ -1,0 +1,67 @@
+{
+    "loan": {
+        "loan_no": "",
+        "funding_loan_no": "",
+        "tenure": "",
+        "tenure_unit": "years",
+        "type": "HL",
+        "amount": "",
+        "interest_rate": 14,
+        "branch_code": "HYD001",
+        "branch_name": "Hyderabad", 
+        "coverage_type" : "Reducing"
+    },
+    "borrowers": [{
+        "title": "Mr",
+        "first_name": "Vishal",
+        "last_name": "Bhat",
+        "phone_number": "6361748623",
+        "gender":"Transgender",
+        "dob": "",
+        "email": "a@b.com",
+        "is_primary_borrower": true,
+        "partner_uid": "CUST8018649635",
+        "pan": "FPNPK9940H",
+        "occupation": "Salaried",
+        "annual_income": 1000000,
+        "address": {
+            "address_line_1": "Address Line 1",
+            "address_line_2": "Address Line 2",
+            "city": "Vadodara",
+            "state": "Gujarat",
+            "zipcode": "390001"
+        }
+    }],
+    "assets": [
+        {
+            "asset_type": "HOME",
+            "owner_name": "XYZ ABC",
+            "additional_info": {
+                "test": "hey"
+            },
+            "address": {
+                "address_line_1": "J H patel badavane",
+                "address_line_2": "Shimoga",
+                "city": "Shimoga",
+                "state": "Gujarat",
+                "zipcode": "360019"
+            },
+            "asset_id": "CUST9999999998"
+        },
+        {
+            "asset_type": "BUSINESS",
+            "owner_name": "XYZ ABC",
+            "additional_info": {
+                "test": "hey"
+            },
+            "address": {
+                "address_line_1": "Address Line 1",
+                "address_line_2": "Address Line 2",
+                "city": "Vadodara",
+                "state": "Gujarat",
+                "zipcode": "390019"
+            },
+            "asset_id": "CUST9999999999"
+        }
+    ]
+}
