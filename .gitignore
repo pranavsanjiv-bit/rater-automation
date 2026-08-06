@@ -1,21 +1,17 @@
-# Virtual environments
+# Python virtual environments
+rater/
 venv/
-.venv/
+ENV/
+env/
 
-# Python
+# Environment variables and secrets
+.env
+
+# Databases
+*.db
+rater.db
+
+# Python cache
 __pycache__/
 *.py[cod]
-
-# Environment variables
-.env
-server/routes/.env
-
-# macOS
-.DS_Store
-
-# Database
-server/rater.db
-
-# IDE
-.vscode/
-.idea/
+*$py.class.DS_Store

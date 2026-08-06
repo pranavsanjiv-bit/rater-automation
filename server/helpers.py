@@ -1,10 +1,23 @@
-from datetime import timedelta, date
-import json
-from hashlib import sha256
-from frontend.formula_eval import FormulaError,validate_formula
-from frontend.dim_parser import get_dimension_slug, get_value_slug, operator_to_slug, _parse_value_with_units
+# ==========================================================
+# Imports
+# ==========================================================
 
-# ── Predefined input variables ────────────────────────────────────────────────
+import json
+from datetime import date, datetime, timedelta
+from hashlib import sha256
+
+from frontend.dim_parser import (
+    _parse_value_with_units,
+    get_dimension_slug,
+    get_value_slug,
+    operator_to_slug,
+)
+from frontend.formula_eval import FormulaError, evaluate_formula, validate_formula
+from server.db import get_db
+
+# ==========================================================
+# Predefined Constants
+# ==========================================================
 # Mirrors _LOS_DIMS / _FE_DIMS / _ALL_DIMS in app.py. These are the single
 # predefined set of input variables shown on the Calculate Premium screen and
 # always usable inside formulas — independent of whether they are part of the
@@ -40,9 +53,16 @@ _PREDEFINED_VARIABLE_SLUGS = {
     if name not in _EXCLUDED_FROM_FORMULA
 }
 
-# ── Slug resolution helpers ───────────────────────────────────────────────────
+# Allowed values for a template's comparison rounding rule — see
+# _parse_template_body below for what each one means.
+_VALID_ROUNDING_RULES = {"none", "nearest", "up", "down"}
+
+# ==========================================================
+# Lookup Key Helpers
+# ==========================================================
 
 def _normalize_float_to_str(value) -> str:
+    """Convert numeric values to a normalized string representation."""
     """
     Convert a numeric value to string, normalizing whole-number floats to integers.
     180.0 → "180"
@@ -55,6 +75,7 @@ def _normalize_float_to_str(value) -> str:
 
 
 def _resolve_input_to_slug(dim_name: str, dim_def: dict, raw_value) -> str:
+    """Resolve an input value to its corresponding lookup key slug."""
     """
     Given a dimension definition and a raw user input value,
     return the slug that would appear in the lookup key.
@@ -155,7 +176,174 @@ def _build_lookup_key(template_def: dict, parsed_dimensions: dict, inputs: dict)
     return "-".join(key_parts), resolved
 
 
-# ── Template body parsing ─────────────────────────────────────────────────────
+def _calculate_premium_for_inputs(full_def: dict, template_id: str, inputs: dict, conn=None) -> tuple[dict, int]:
+    """
+    The exact lookup_key -> rate_values -> formula pipeline that used to
+    live inline in the POST /templates/<id>/calculate route body, extracted
+    verbatim (not rewritten) so there is exactly one implementation shared
+    by that route and the new bulk calculator. Returns (response_body,
+    http_status) — identical shape/status codes to what the route already
+    returned before this extraction.
+
+    conn: an already-open DB connection to reuse for the rate_values
+    lookup. The bulk route passes one connection shared across every row
+    (avoids opening a new connection per row for large uploads). If None,
+    a connection is opened and closed here for just this one lookup —
+    matching the single-row route's original behaviour exactly.
+    """
+    calculation = full_def.get("calculation", {})
+    formula = calculation.get("formula", "").strip()
+    constants_list = calculation.get("constants", [])
+    constants = {c["name"]: float(c["value"]) for c in constants_list}
+
+    if "dob" in inputs and "age" not in inputs:
+        try:
+            inputs["age"] = _dob_to_age(inputs["dob"])
+        except ValueError as e:
+            return {"error": str(e)}, 400
+
+    try:
+        lookup_key, resolved_buckets = _build_lookup_key(full_def, full_def.get("parsed_dimensions", {}), inputs)
+    except ValueError as e:
+        return {"error": str(e)}, 400
+
+    owns_conn = conn is None
+    if owns_conn:
+        conn = get_db()
+    try:
+        val_row = conn.execute(
+            "SELECT value FROM rate_values WHERE template_id = ? AND lookup_key = ?",
+            (template_id, lookup_key),
+        ).fetchone()
+    finally:
+        if owns_conn:
+            conn.close()
+
+    if not val_row:
+        return {
+            "error": "No rate value found for the given inputs.",
+            "lookup_key": lookup_key,
+            "resolved_buckets": resolved_buckets,
+        }, 404
+
+    rater_val = float(val_row["value"])
+
+    if not formula:
+        return {
+            "rater_val": rater_val,
+            "base_premium": rater_val,
+            "lookup_key": lookup_key,
+            "resolved_buckets": resolved_buckets,
+            "note": "No formula defined; base_premium = rater_val.",
+        }, 200
+
+    eval_context = {
+        "rater_val": rater_val,
+        **{k: float(v) for k, v in inputs.items() if isinstance(v, (int, float, str)) and str(v).replace(".", "").lstrip("-").isdigit()},
+        **constants,
+    }
+
+    try:
+        base_premium = evaluate_formula(formula, eval_context)
+    except FormulaError as e:
+        return {"error": f"Formula evaluation failed: {e}"}, 500
+
+    return {
+        "rater_val": rater_val,
+        "base_premium": base_premium,
+        "lookup_key": lookup_key,
+        "resolved_buckets": resolved_buckets,
+        "formula": formula,
+    }, 200
+
+
+# ==========================================================
+# Dimension Library Helpers
+# ==========================================================
+# Mirrors _parse_template_body's validation style below, kept as separate
+# functions (not a modification of it) since a library dimension is a
+# different object shape: a single reusable {name, type, config}, not a
+# full rate-template definition.
+
+_VALID_DIM_TYPES = {"Enum", "Range", "Comparison"}
+
+
+def _validate_dimension_config(dim_type: str, config: dict) -> str | None:
+    """Return an error message string if invalid, else None. Reuses the same
+    Enum/Range/Comparison config shapes already used throughout the app
+    (build_dim_from_form / _axis_def / _parse_dim_to_dict in frontend/app.py) —
+    no new/parallel shape is introduced."""
+    if dim_type not in _VALID_DIM_TYPES:
+        return f"'type' must be one of {sorted(_VALID_DIM_TYPES)}, got '{dim_type}'."
+
+    if not isinstance(config, dict):
+        return "'config' must be an object."
+
+    if dim_type == "Enum":
+        values = config.get("values")
+        if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
+            return "Enum config requires a 'values' list of strings."
+    elif dim_type == "Range":
+        if "min" not in config or "max" not in config:
+            return "Range config requires 'min' and 'max'."
+        try:
+            if float(config["min"]) > float(config["max"]):
+                return "Range 'min' cannot be greater than 'max'."
+        except (TypeError, ValueError):
+            return "Range 'min'/'max' must be numeric."
+    elif dim_type == "Comparison":
+        comparisons = config.get("comparisons")
+        if not isinstance(comparisons, list) or not comparisons:
+            return "Comparison config requires a non-empty 'comparisons' list."
+        for c in comparisons:
+            if not isinstance(c, dict) or "op" not in c or "val" not in c:
+                return "Each comparison requires 'op' and 'val'."
+
+    return None
+
+
+def _parse_dimension_library_body(body: dict) -> tuple[dict, str, str] | tuple[None, None, str]:
+    """Validate a Dimension Library create/update request body.
+
+    Returns (parsed, name, None) on success, or (None, None, error_message).
+    'parsed' is {"name": str, "type": str, "config": dict} — ready to persist.
+    """
+    name = (body.get("name") or "").strip()
+    dim_type = body.get("type")
+    config = body.get("config")
+
+    if not name:
+        return None, None, "'name' is required."
+    if dim_type not in _VALID_DIM_TYPES:
+        return None, None, f"'type' must be one of {sorted(_VALID_DIM_TYPES)}."
+    if not isinstance(config, dict):
+        return None, None, "'config' is required and must be an object."
+
+    err = _validate_dimension_config(dim_type, config)
+    if err:
+        return None, None, err
+
+    return {"name": name, "type": dim_type, "config": config}, name, None
+
+
+def _dimension_in_use(conn, name: str) -> int:
+    """Best-effort check for whether a dimension name is referenced by any
+    saved template. There is no foreign key from rate_templates to dimension
+    names (they are simply keys inside the definition_json blob), so this is
+    a heuristic LIKE search, not a guaranteed referential-integrity check.
+    Returns the number of templates whose definition_json appears to
+    reference the given dimension name."""
+    needle = f'"{name}"'
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM rate_templates WHERE definition_json LIKE ?",
+        (f"%{needle}%",),
+    ).fetchone()
+    return row["n"] if row else 0
+
+
+# ==========================================================
+# Template Helpers
+# ==========================================================
 
 def _parse_template_body(body: dict) -> tuple[dict, str, str] | tuple[None, None, str]:
     """Validate request body and return (full_def, name, content_hash) or (None, None, error)."""
@@ -166,7 +354,7 @@ def _parse_template_body(body: dict) -> tuple[dict, str, str] | tuple[None, None
 
     if definition is None or parsed_dimensions is None:
         return None, None, "'definition' and 'parsed_dimensions' are required."
-    
+
     formula = calculation.get("formula", "").strip()
     if formula:
         constants = {c["name"] for c in calculation.get("constants", [])}
@@ -177,10 +365,22 @@ def _parse_template_body(body: dict) -> tuple[dict, str, str] | tuple[None, None
         except FormulaError as e:
             return None, None, f"Formula validation failed: {e}"
 
+    # Rounding rule applied when comparing this template's local premium
+    # against the Partner API's premium — never changes the calculated
+    # premium itself, only whether a MATCH/MISMATCH verdict tolerates the
+    # partner rounding to a whole rupee. "nearest" is the default since
+    # every partner integration seen so far rounds this way; "none" keeps
+    # the original exact (to-the-paisa) comparison if a future partner
+    # ever needs that instead.
+    rounding_rule = body.get("rounding_rule", "nearest")
+    if rounding_rule not in _VALID_ROUNDING_RULES:
+        return None, None, f"'rounding_rule' must be one of {sorted(_VALID_ROUNDING_RULES)}, got '{rounding_rule}'."
+
     full_def = {
         "definition": definition,
         "parsed_dimensions": parsed_dimensions,
         "calculation": calculation,
+        "rounding_rule": rounding_rule,
     }
     content_hash = sha256(json.dumps(full_def, sort_keys=True).encode()).hexdigest()
     return full_def, name, content_hash
@@ -200,7 +400,10 @@ def _read_workbook_meta(wb) -> dict:
         raise ValueError(f"_meta payload is not valid JSON: {e}") from e
 
 
-def _age_to_dob(age: int, format = None) -> str:
+# ==========================================================
+# Date Utilities
+# =========================================================
+def _age_to_dob(age: int, format=None) -> str:
     """Convert age in years to a DD-MM-YYYY string (approximate)."""
     today = date.today()
     dob = today - timedelta(days=age * 365.25)
@@ -209,7 +412,6 @@ def _age_to_dob(age: int, format = None) -> str:
 
 def _dob_to_age(dob_str: str) -> int:
     """Calculate age from a DOB string in DD-MM-YYYY, YYYY-MM-DD, or DD/MM/YYYY formats."""
-    from datetime import datetime, date
     for fmt in ("%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"):
         try:
             dob = datetime.strptime(dob_str, fmt).date()
@@ -219,4 +421,3 @@ def _dob_to_age(dob_str: str) -> int:
         except ValueError:
             continue
     raise ValueError(f"Invalid DOB format: '{dob_str}'. Expected DD-MM-YYYY.")
-

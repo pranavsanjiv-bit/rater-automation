@@ -1,0 +1,78 @@
+{
+    "loan": {
+                
+        "application_no": "LENDPRODEMO-020726182331",
+        "funding_loan_no": "080820251055",
+        "tenure": 300,
+        "tenure_unit": "MONTHS",
+        "type": "HL",
+        "amount": 4000000,
+        "interest_rate": 14,
+        "branch_code": "RISK",
+        "branch_name": "Hyderaad",
+        "emi_amount": 1000,
+        "margin": 3000000
+    },
+    "proposer_id": "CUST7815830300",
+    "borrowers": [
+        {
+            "borrower_type": "Individual", 
+            "title": "Ms",
+            "first_name": "Vishal ",
+            "last_name": "bhat",
+            "phone_number": "7800090002",
+            "gender": "male",
+            "dob": "10-05-1994",
+            "email": "leela.matc@iskcovry.com",
+            "is_primary_borrower": true,
+            "partner_uid": "CUST7815830300",
+            "pan": "BQTPN0171R",
+            "occupation": "Salaried",
+            "annual_income": "1000000.00",
+            "address": {
+                "address_line_1": "Borrower 1 address",
+                "address_line_2": "",
+                "city": "Thiruvanthapuram",
+                "state": "Kerala",
+                "zipcode": "673586"
+            }
+        },
+        {
+            "borrower_type": "Individual", 
+            "title": "Ms",
+            "first_name": "Vishal ",
+            "last_name": "bhat",
+            "phone_number": "7800090002",
+            "gender": "male",
+            "dob": "01-01-1974",
+            "email": "leela.matc@iskcovry.com",
+            "is_primary_borrower": false,
+            "partner_uid": "CUST7815830301",
+            "pan": "BQTPN0171R",
+            "occupation": "Self Employee",
+            "annual_income": "1000000.00",
+            "address": {
+                "address_line_1": "Borrower 1 address",
+                "address_line_2": "",
+                "city": "Thiruvanthapuram",
+                "state": "Kerala",
+                "zipcode": "673586"
+            }
+        }
+    ],
+    "assets": [
+        {
+            "asset_id": "AST9999999990",
+            "asset_type": "HOME",
+            "asset_value": 1212323.45, 
+            "owner_name": "XYZ ABC",
+            "address": {
+                "address_line_1": "Asset Li le ne 1 test",
+                "address_line_2": "Address Line 2",
+                "city": "Thiruvanthapuram",
+                "state": "Kerala",
+                "zipcode": "673586"
+            }
+        }
+    ]
+}

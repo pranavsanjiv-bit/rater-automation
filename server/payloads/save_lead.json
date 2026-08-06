@@ -1,0 +1,70 @@
+{
+    "proposer": {
+        "title": "",
+        "first_name": "Vishal",
+        "last_name": "Kiran",
+        "phone_number": "6361748623",
+        "gender": "Male",
+        "dob": "28/10/1991",
+        "email": "kavana.ds@risckcovry.com",
+        "is_primary_borrower": true,
+        
+        "address": {
+            "zipcode": "151105",
+            "state": "chatisgarh",
+            "city": "Vadodara",
+            "address_line_2": "ATTN: Mr. John-Paul Smith, PhD, & Associates / Acquisition & Curatorial Department (Special Collections, Wing #4B, The +1 Floor), The Grand Museum o",
+            "address_line_1": "ATTN: Mr. John-Paul Smith, PhD, & Associates / Acquisition & Curatorial Department (Special Collections, Wing #4B, The +1 Floor), The Grand Museum o"
+        }
+    },
+    "borrowers": [
+        {
+            "address": {
+                "zipcode": "151105",
+                "state": "chatisgarh",
+                "city": "Vadodara",
+                "address_line_2": "ATTN: Mr. John-Paul Smith, PhD, & Associates / Acquisition & Curatorial Department (Special Collections, Wing #4B, The +1 Floor), The Grand Museum o",
+                "address_line_1": "ATTN: Mr. John-Paul Smith, PhD, & Associates / Acquisition & Curatorial Department (Special Collections, Wing #4B, The +1 Floor), The Grand Museum o"
+            },
+            "email": "kavana.ds@risckcovry.com",
+            "occupation": "Business",
+            "gender": "Male",
+            "phone_number": "6361748623",
+            "first_name": "Vishal Test",
+            "last_name": "Kiran",
+            "title": null,
+            "pan": "GDGHJ3145G",
+            "dob": "28/10/1991",
+            "father_first_name": "Venktesh",
+            "father_last_name": "Kiran",
+            "annual_income": 40000000,
+            "education": "Post Graduate",
+            "nominee_first_name": "SASSAS",
+            "nominee_last_name": "BZBZB",
+            "nominee_relation": "Brother",
+            "nominee_dob": "01-10-1998",
+            "nominee_title": null,
+            "nominee_gender": "Male"
+        }
+    ],
+    "property": {
+        "type": "HOME",
+        "asset_value": null,
+        "address": {
+            "zipcode": "151105",
+            "state": "chatisgarh",
+            "city": "Vadodara",
+            "address_line_2": "ATTN: Mr. John-Paul Smith, PhD, & Associates / Acquisition & Curatorial Department (Special Collections, Wing #4B, The +1 Floor), The Grand Museum o",
+            "address_line_1": "ATTN: Mr. John-Paul Smith, PhD, & Associates / Acquisition & Curatorial Department (Special Collections, Wing #4B, The +1 Floor), The Grand Museum o"
+        }
+    },
+    "loan_tenure": 72,
+    "loan_tenure_unit": "months",
+    "loan_amount": 300000,
+    "interest_rate": 10,
+    "loan_type": "Secured Business Loan",
+    "loan_commencement_date": "01-02-2024",
+    "loan_number": "PRIME-11112378136",
+    "funding_loan_number": "PRIME-11112378136",
+    "branch_code": "1000651"
+}
