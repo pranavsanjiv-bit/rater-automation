@@ -247,30 +247,27 @@ def _apply_rounding_rule(val, rounding_rule: str):
 
 def _build_comparison_row(label: str, local_val, partner_val, rounding_rule: str = "nearest") -> dict:
     """One row of the sanity-check comparison. If either side didn't return
-    this metric, the row is 'unavailable' rather than a false MATCH/MISMATCH.
-
-    rounding_rule only affects the MATCH/MISMATCH verdict — the 'local'/
-    'partner'/'diff' values returned here always stay at full (2dp)
-    precision, so nothing about the displayed or exported premium numbers
-    changes regardless of which rule is chosen. This exists because a
-    partner API commonly returns whole-rupee premiums while the local
-    Excel-derived calculation keeps decimals, which would otherwise show
-    as a MISMATCH for a difference that's really just rounding, not a
-    rating error."""
+    this metric, the row is 'unavailable' rather than a false MATCH/MISMATCH."""
     local_r = _round2(local_val)
     partner_r = _round2(partner_val)
 
     if local_r is None or partner_r is None:
-        status, diff = "unavailable", None
-    elif _apply_rounding_rule(local_r, rounding_rule) == _apply_rounding_rule(partner_r, rounding_rule):
-        status, diff = "match", 0.0
+        status, local_display, partner_display, diff = "unavailable", local_r, partner_r, None
     else:
-        status, diff = "mismatch", abs(local_r - partner_r)
+        # Apply the rounding rule to local so display values and diff reflect the comparison
+        local_display = _round2(_apply_rounding_rule(local_r, rounding_rule))
+        partner_display = _round2(_apply_rounding_rule(partner_r, rounding_rule))
+        diff = _round2(abs(local_display - partner_display))
+        status = "match" if diff == 0.0 else "mismatch"
 
     status_label = {"match": "🟢 MATCH", "mismatch": "🔴 MISMATCH", "unavailable": "⚪ Unavailable"}[status]
     return {
-        "label": label, "local": local_r, "partner": partner_r, "diff": diff,
-        "status": status, "status_label": status_label,
+        "label": label,
+        "local": local_display,
+        "partner": partner_display,
+        "diff": diff,
+        "status": status,
+        "status_label": status_label,
     }
 
 

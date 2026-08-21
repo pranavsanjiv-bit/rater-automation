@@ -1,7 +1,7 @@
 # pyrefly: ignore [missing-import]
 import streamlit as st
-import pandas as pd  # <-- ADD THIS
-import io         # <-- ADD THIS
+import pandas as pd  
+import io        
 # pyrefly: ignore [missing-import]
 from code_editor import code_editor as st_code_editor
 import re
@@ -2638,33 +2638,43 @@ def _render_bulk_upload_mode():
         bulk_input_filename = "input_from_spreadsheet.xlsx"
 
     st.write("")
+
+    # 1. Trigger calculation via session state flag
     if st.button("Calculate Bulk Premiums", type="primary", key="bulk_calc_btn", disabled=bulk_input_bytes is None):
-            with st.spinner("Starting bulk job..."):
-                start_res = _start_bulk_premium_job(
-                    tid, bulk_input_bytes, bulk_input_filename, flow_type,
-                    custom_payload=st.session_state.custom_payloads.get(flow_type),
-                )
+        st.session_state["run_bulk_job"] = True
+        st.session_state.pop("bulk_result_bytes", None)
+        st.session_state.pop("bulk_result_name", None)
 
-            if not start_res["ok"]:
-                st.error(start_res["error"], icon="⚠️")
+    # 2. Execute job when flag is active
+    if st.session_state.pop("run_bulk_job", False):
+        with st.spinner("Starting bulk job..."):
+            start_res = _start_bulk_premium_job(
+                tid, bulk_input_bytes, bulk_input_filename, flow_type,
+                custom_payload=st.session_state.custom_payloads.get(flow_type),
+            )
+
+        if not start_res["ok"]:
+            st.error(start_res["error"], icon="⚠️")
+        else:
+            job_id = start_res["job_id"]
+            with st.spinner("Bulk job running — polling status..."):
+                status_res = _poll_bulk_job_status(tid, job_id, interval=2, timeout=900)
+
+            if not status_res["ok"]:
+                st.error(status_res["error"], icon="⚠️")
             else:
-                job_id = start_res["job_id"]
-                with st.spinner("Bulk job running — polling status..."):
-                    status_res = _poll_bulk_job_status(tid, job_id, interval=2, timeout=900)
+                job_status = status_res["status"]
+                if job_status["status"] == "failed":
+                    st.error(job_status.get("error_message") or "Bulk job failed.", icon="⚠️")
+                elif job_status["status"] == "complete":
+                    download_res = _download_bulk_job_result(tid, job_id)
+                    if not download_res["ok"]:
+                        st.error(download_res["error"], icon="⚠️")
+                    else:
+                        st.session_state["bulk_result_bytes"] = download_res["content"]
+                        st.session_state["bulk_result_name"] = job_status.get("result_filename") or f"bulk_premium_results_{selected_name.replace(' ', '_')}.xlsx"
 
-                if not status_res["ok"]:
-                    st.error(status_res["error"], icon="⚠️")
-                else:
-                    job_status = status_res["status"]
-                    if job_status["status"] == "failed":
-                        st.error(job_status.get("error_message") or "Bulk job failed.", icon="⚠️")
-                    elif job_status["status"] == "complete":
-                        download_res = _download_bulk_job_result(tid, job_id)
-                        if not download_res["ok"]:
-                            st.error(download_res["error"], icon="⚠️")
-                        else:
-                            st.session_state["bulk_result_bytes"] = download_res["content"]
-                            st.session_state["bulk_result_name"] = job_status.get("result_filename") or f"bulk_premium_results_{selected_name.replace(' ', '_')}.xlsx"
+    # 3. Render results immediately
     if st.session_state.get("bulk_result_bytes"):
         out_wb = openpyxl.load_workbook(io.BytesIO(st.session_state["bulk_result_bytes"]))
         out_ws = out_wb.active
@@ -2687,9 +2697,8 @@ def _render_bulk_upload_mode():
         st.write("")
         overview_cols = st.columns(4)
         overview_cols[0].metric("Total rows", total)
-        overview_cols[1].metric("Successful rows", ok_count)
-        overview_cols[2].metric("Error rows", error_count)
-        overview_cols[3].metric("Mismatch rows", mismatch_count)
+        overview_cols[1].metric("Error rows", error_count)
+        overview_cols[2].metric("Mismatch rows", mismatch_count)
 
         summary = f"{ok_count}/{total} rows processed successfully"
         if mismatch_count:
